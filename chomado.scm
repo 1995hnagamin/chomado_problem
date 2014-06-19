@@ -4,8 +4,15 @@
     ((= (car a) (car b)) (hamming-help (cdr a) (cdr b) c))
     (else (hamming-help (cdr a) (cdr b) (+ 1 c)))))
 
+(define *hamming-table* (make-hash-table 'equal?))
+
 (define (hamming a b)
-  (hamming-help a b 0))
+  (if (hash-table-exists? *hamming-table* (list a b))
+    (hash-table-get *hamming-table* (list a b))
+    (let ((val (hamming-help a b 0)))
+      (hash-table-put! *hamming-table* (list a b) val)
+      (hash-table-put! *hamming-table* (list b a) val)
+      val)))
 
 (define (assoc-set alist key val)
   (cond
@@ -15,18 +22,22 @@
 
 (define (assoc-cons alist key val)
   (let ((v (assoc key alist)))
-  (assoc-set alist key (cons val (if v (cdr v) '())))))
+    (assoc-set alist key (cons val (if v (cdr v) '())))))
 
-(define (hm-eqrel-help alist vec vecs)
+(define (assoc-increment alist key)
+    (let ((v (assoc key alist)))
+        (assoc-set alist key (+ 1 (if v (cdr v) 0)))))
+
+(define (hm-eqn-help alist vec vecs)
   (if (null? vecs)
     alist
     (let ((nkey (hamming vec (car vecs))))
-      (hm-eqrel-help (assoc-cons alist nkey (car vecs))
-                     vec
-                     (cdr vecs)))))
+      (hm-eqn-help (assoc-increment alist nkey)
+                   vec
+                   (cdr vecs)))))
 
 (define (hm-alist vec vecs)
-  (hm-eqrel-help '() vec vecs))
+  (hm-eqn-help '() vec vecs))
 
 (define (hm-eqrel vec vecs)
   (map cdr (hm-alist vec vecs)))
@@ -42,7 +53,7 @@
   (max-length-help lists 0))
 
 (define (division vec vecs)
-  (max-length (hm-eqrel vec vecs)))
+  (apply max (hm-eqrel vec vecs)))
 
 (define (minimum f xs)
   (letrec ((M
@@ -58,18 +69,29 @@
 (define (most-favorable-dividor vecs)
   (minimum (lambda (vec) (division vec vecs)) vecs))
 
-(define (answer f candidates nums-of-questions trial)
-  (let* ((cand (if (= trial 1)
-                 (iota nums-of-questions 1 0)
-                 (most-favorable-dividor candidates)))
+(define *mfd-table* (make-hash-table))
+
+(define (answer f candidates nums score trial)
+  (let* ((cand (cond
+                 ((= trial 1) (iota nums 1 0))
+                 ((and (= trial 2) (hash-table-exists? *mfd-table* nums)) (hash-table-get *mfd-table* nums))
+                 ((= trial 2)
+                  (let ((val (most-favorable-dividor candidates)))
+                    (hash-table-put! *mfd-table* score val)
+                    val))
+                 (else (most-favorable-dividor candidates))))
          (score (f cand)))
-    (if (= nums-of-questions score)
+    (disp ", candidates:")
+    (disp (length candidates))
+    (disp "\n")
+    (if (= nums score)
       trial
       (answer f
-              (filter (lambda (vec) (= (- nums-of-questions score)
+              (filter (lambda (vec) (= (- nums score)
                                        (hamming cand vec)))
                       candidates)
-              nums-of-questions
+              nums
+              score
               (+ 1 trial)))))
 
 (define (disp something)
@@ -81,7 +103,6 @@
       (disp student)
       (disp ": ")
       (disp (- n (hamming student answer)))
-      (disp "\n")
       (- n (hamming student answer)))))
 
 (define (repeat-perm n l)
@@ -98,4 +119,5 @@
   (answer (akapen ans)
           (repeat-perm (length ans) (list 1 2 3 4))
           (length ans)
+          0
           1))

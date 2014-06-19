@@ -2,9 +2,6 @@
 
 (define disp (lambda (x) '()))
 (define n 10)
-(define (assoc-inclement alist key)
-    (let ((v (assoc key alist)))
-        (assoc-set alist key (+ 1 (if v (cdr v) 0)))))
 
 (define (test)
   (let ((alist '()))
@@ -13,7 +10,7 @@
                   (display answer)
                   (display ":")
                   (print n)
-                  (set! alist (assoc-inclement alist n))))
+                  (set! alist (assoc-increment alist n))))
               (repeat-perm n '(1 2 3 4)))
     alist))
 
